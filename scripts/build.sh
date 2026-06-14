@@ -58,10 +58,18 @@ echo "TRIPLE=\"$TRIPLE\"" >> /etc/environment
 echo "CPU=\"$CPU\"" >> /etc/environment
 echo "NOCROSS=\"$NOCROSS\"" >> /etc/environment
 
+echo "=============================="
+echo "Config: $TARGET (cross-compile: ${NOCROSS:-0})"
+echo "TRIPLE: $TRIPLE"
+echo "CPU: $CPU"
+echo "CC: $CC"
+echo "CXX: $CXX"
+echo "=============================="
+
 if [ $NOCROSS -eq 1 ]; then
   echo "Compiling native"
-  ./configure --target=$TRIPLE --dest-cpu=$CPU
+  ./configure --dest-cpu=$CPU
 else
   echo "Compiling cross-compile"
-  ./configure --target=$TRIPLE --dest-cpu=$CPU --cross-compiling
+  ./configure --dest-cpu=$CPU --cross-compiling
 fi

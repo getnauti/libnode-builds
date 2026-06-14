@@ -18,13 +18,13 @@ jobs:
     strategy:
       matrix:
         target:
-          - { target: alpine-arm64 }
-          - { target: alpine-x64 }
+          # - { target: alpine-arm64 }
+          # - { target: alpine-x64 }
           - { target: linux-arm64 }
           - { target: linux-x64 }
-          - { target: linuxstatic-arm64 }
-          - { target: linuxstatic-armv7 }
-          - { target: linuxstatic-x64 }
+          # - { target: linuxstatic-arm64 }
+          # - { target: linuxstatic-armv7 }
+          # - { target: linuxstatic-x64 }
           # - { target: macos-arm64 }
           # - { target: macos-x64 }
           - { target: win-arm64 }
