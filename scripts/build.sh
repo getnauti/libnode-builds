@@ -51,8 +51,8 @@ CPU=arm64
 
 esac
 
-CC="clang --target=$TRIPLE"
-CXX="clang++ --target=$TRIPLE"
+export CC="clang --target=$TRIPLE"
+export CXX="clang++ --target=$TRIPLE"
 
 echo "TRIPLE=\"$TRIPLE\"" >> /etc/environment
 echo "CPU=\"$CPU\"" >> /etc/environment
