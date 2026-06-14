@@ -55,9 +55,7 @@ jobs:
       - name: Build
         run: |
           docker build \
-            --build-arg TARGET_OS=${{ matrix.target.os }} \
-            --build-arg TARGET_ARCH=${{ matrix.target.arch }} \
-            --build-arg TARGET_LIBC=${{ matrix.target.libc }} \
+            --build-arg TARGET=${{ matrix.target }} \
             --build-arg NODE_VERSION=${{ startsWith(github.ref_name, 'v') && github.ref_name || steps.info.outputs.latest_version }} \
             -t ${{ secrets.ALIYUN_REGISTRY }}/${{ secrets.ALIYUN_NAMESPACE }}/node-build-cache:${{ github.ref_name }}-${{ matrix.target }} \
             -f Dockerfile .
