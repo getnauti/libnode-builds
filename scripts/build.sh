@@ -10,18 +10,27 @@ export OBJDUMP=llvm-objdump
 export STRIP=llvm-strip
 export RANLIB=llvm-ranlib
 export LD=ld.lld
-CPU=x64
-NOCROSS=1
+# CPU=x64
+# NOCROSS=1
 export CC="clang"
 export CXX="clang++"
+export CC_host=clang
+export CXX_host=clang++
+./configure
 ;;
 
 linux-arm64)
-export CC=aarch64-linux-gnu-gcc
-export CXX=aarch64-linux-gnu-g++
-export AR=ar
-export LD=ld
+export CC_host=gcc
+export CXX_host=g++
+ENV CC=aarch64-linux-gnu-gcc-12
+ENV CXX=aarch64-linux-gnu-g++-12
+ENV AR=aarch64-linux-gnu-ar
+ENV NM=aarch64-linux-gnu-nm
+ENV RANLIB=aarch64-linux-gnu-ranlib
+ENV READELF=aarch64-linux-gnu-readelf
+ENV STRIP=aarch64-linux-gnu-strip
 CPU=arm64
+./configure --dest-cpu=$CPU --dest-os=linux --cross-compiling
 # SYSROOT=/usr/aarch64-linux-gnu
 # export CC="clang --target=aarch64-linux-gnu --sysroot=$SYSROOT --gcc-toolchain=/usr"
 # export CXX="clang++ --target=aarch64-linux-gnu --sysroot=$SYSROOT --gcc-toolchain=/usr"
@@ -68,9 +77,6 @@ CPU=arm64
 
 esac
 
-export CC_host=clang
-export CXX_host=clang++
-
 echo "CPU=\"$CPU\"" >> /etc/environment
 echo "NOCROSS=\"$NOCROSS\"" >> /etc/environment
 
@@ -80,12 +86,12 @@ echo "CC: $CC"
 echo "CXX: $CXX"
 echo "=============================="
 
-if [ "${NOCROSS:-0}" -eq 1 ]; then
-  echo "Compiling native"
-  ./configure --dest-cpu=$CPU
-else
-  echo "Compiling cross-compile"
-  ./configure --dest-cpu=$CPU --cross-compiling
-fi
+# if [ "${NOCROSS:-0}" -eq 1 ]; then
+#   echo "Compiling native"
+#   ./configure --dest-cpu=$CPU
+# else
+#   echo "Compiling cross-compile"
+#   ./configure --dest-cpu=$CPU --cross-compiling
+# fi
 
 make -j$(nproc)

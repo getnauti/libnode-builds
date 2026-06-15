@@ -41,7 +41,12 @@ RUN apt-get install -y \
     libc6-dev-arm64-cross \
     gcc-aarch64-linux-gnu \
     g++-aarch64-linux-gnu \
-    binutils-aarch64-linux-gnu
+    binutils-aarch64-linux-gnu \
+    gcc \
+    g++ \
+    libatomic1 \
+    binutils-aarch64-linux-gnu \
+    g++-12-aarch64-linux-gnu
 
 WORKDIR /usr/src
 
