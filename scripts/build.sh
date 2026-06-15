@@ -73,7 +73,7 @@ echo "CC: $CC"
 echo "CXX: $CXX"
 echo "=============================="
 
-if [ $NOCROSS -eq 1 ]; then
+if [ "${NOCROSS:-0}" -eq 1 ]; then
   echo "Compiling native"
   ./configure --dest-cpu=$CPU
 else
