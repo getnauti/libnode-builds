@@ -53,6 +53,8 @@ esac
 
 export CC="clang --target=$TRIPLE"
 export CXX="clang++ --target=$TRIPLE"
+export CC_host=clang
+export CXX_host=clang++
 
 echo "TRIPLE=\"$TRIPLE\"" >> /etc/environment
 echo "CPU=\"$CPU\"" >> /etc/environment
