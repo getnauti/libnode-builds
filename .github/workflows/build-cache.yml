@@ -32,15 +32,14 @@ jobs:
             ccache \
             pkg-config
 
-      - name: Checkout Node.js (Linux)
-        if: matrix.target.os == 'linux'
+      - name: Checkout Node.js Source Code
         run: |
-          curl -L -o node.tar.xz https://nodejs.org/dist/v${{ matrix.node_version }}/node-v${{ matrix.node_version }}-${{ matrix.target.os }}-${{ matrix.target.arch }}.tar.xz
-          tar -xJf node.tar.xz
+          curl -L -o node.tar.gz https://github.com/nodejs/node/archive/refs/tags/v${{ matrix.node_version }}.tar.gz
+          tar -zxf node.tar.gz
           ls -al
-          mv ./node-v${{ matrix.node_version }}-${{ matrix.target.os }}-${{ matrix.target.arch }} ./node
-          rm -f ./node.tar.xz
-          ls -al
+          mv ./node-${{ matrix.node_version }} ./node
+          rm -f ./node.tar.gz
+          ls -al ./node
           chmod +x ./node/configure
 
       - name: Setup ccache
