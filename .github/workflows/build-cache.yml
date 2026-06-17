@@ -39,7 +39,6 @@ jobs:
             musl-tools
 
       - name: Checkout Node.js Source Code
-        shell: bash
         run: |
           curl -L -o node.tar.gz \
             https://github.com/nodejs/node/archive/refs/tags/v${{ matrix.node_version }}.tar.gz
@@ -48,14 +47,12 @@ jobs:
           rm node.tar.gz
 
       - name: Setup ccache
-        shell: bash
         run: |
           mkdir -p "${{ env.CCACHE_DIR }}"
           ccache --set-config=max_size=10G
           ccache --zero-stats
 
       - name: Setup MUSL ARM64
-        shell: bash
         if: ${{ (matrix.target.os == 'alpine' || matrix.target.os == 'linuxstatic') && matrix.target.arch == 'arm64' }}
         run: |
           curl -LO https://github.com/troglobit/misc/releases/download/11-20211120/aarch64-linux-musl-cross.tgz
@@ -63,7 +60,6 @@ jobs:
           rm -rf aarch64-linux-musl-cross.tgz
 
       - name: Setup MUSL x64
-        shell: bash
         if: ${{ (matrix.target.os == 'alpine' || matrix.target.os == 'linuxstatic') && matrix.target.arch == 'x64' }}
         run: |
           curl -LO https://github.com/troglobit/misc/releases/download/11-20211120/x86_64-linux-musl-cross.tgz
@@ -71,7 +67,6 @@ jobs:
           rm -rf x86_64-linux-musl-cross.tgz
 
       - name: Configure
-        shell: bash
         env:
           OS: ${{ matrix.target.os }}
         working-directory: node
@@ -117,25 +112,21 @@ jobs:
           ./configure $BUILD_ARGS
 
       - name: Build
-        shell: bash
         working-directory: node
         run: |
           make -j$(nproc)
 
       - name: Show ccache stats
-        shell: bash
         run: |
           ccache --show-stats
 
       - name: Package build cache
-        shell: bash
         run: |
           mkdir artifact
           cp -r node artifact/node
           cp -r .ccache artifact/.ccache
 
       - name: Create archive
-        shell: bash
         run: |
           tar -cf - artifact | brotli > node-${{ matrix.node_version }}-${{ matrix.target.os }}-${{ matrix.target.arch }}.tar.br
 
@@ -145,67 +136,163 @@ jobs:
           key: ${{ github.run_id }}-${{ matrix.node_version }}-${{ matrix.target.os }}-${{ matrix.target.arch }}
           path: node-${{ matrix.node_version }}-${{ matrix.target.os }}-${{ matrix.target.arch }}.tar.br
 
-  # build-windows:
-  #   strategy:
-  #     matrix:
-  #       node_version: ["24.16.0"]
-  #       target:
-  #         - { os: "windows", arch: "x64", runner: "windows-latest" }
-  #         - { os: "windows", arch: "arm64", runner: "windows-11-arm" }
-
-  #   runs-on: ${{ matrix.target.runner }}
-
-  #   env:
-  #     CCACHE_DIR: ${{ github.workspace }}/.ccache
-
-  #   steps:
-  #     - uses: actions/checkout@v4
-
-  #     - name: Set up Python
-  #       uses: actions/setup-python@v6
-  #       with:
-  #         python-version: '3.12'
-  #         check-latest: true
-
-  #     - run: choco install nasm
-
-  #     - uses: ./.github/actions/build-node-cache
-  #       with:
-  #         node_version: ${{ matrix.node_version }}
-  #         os: ${{ matrix.target.os }}
-  #         arch: ${{ matrix.target.arch }}
-  #         token: ${{ secrets.GITHUB_TOKEN }}
-  #         run_id: ${{ github.run_id }}
-  #         ccache_dir: ${{ env.CCACHE_DIR }}
-
-  aggregation-artifacts:
-    needs:
-      - build-linux-standard-and-static-libc-arm64
-      - build-linux-static-libc-x64
-
+  build-windows:
     strategy:
       matrix:
         node_version: ["24.16.0"]
         target:
-          - { os: "linux", arch: "arm64", runner: "ubuntu-24.04-arm" }
-          - { os: "alpine", arch: "arm64", runner: "ubuntu-24.04-arm" }
-          - { os: "linuxstatic", arch: "arm64", runner: "ubuntu-24.04-arm" }
+          - { os: "windows", arch: "x64", runner: "windows-latest" }
+          - { os: "windows", arch: "arm64", runner: "windows-11-arm" }
 
-    runs-on: ubuntu
+    runs-on: ${{ matrix.target.runner }}
+
+    env:
+      ccache_dir: ${{ github.workspace }}/.ccache
 
     steps:
-      - name: Restore Cache
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+          check-latest: true
+
+      - name: Install NASM
+        shell: cmd
+        run: choco install nasm brotli -y
+
+      - name: Build
+        env:
+          "config_flags": "--enable-lto --without-inspector --without-npm --use-ccache-win --with-ltcg "
+        run: |
+          cmd /c "vcbuild.bat ${{ matrix.target.arch }} full-icu ccache %ccache_dir%"
+
+      - name: Package build cache
+        shell: bash
+        run: |
+          mkdir artifact
+          cp -r node artifact/node
+          cp -r .ccache artifact/.ccache
+
+      - name: Create archive
+        run: |
+          tar -cf node-${{ matrix.node_version }}-${{ matrix.target.os }}-${{ matrix.target.arch }}.tar artifact
+          brotli node-${{ matrix.node_version }}-${{ matrix.target.os }}-${{ matrix.target.arch }}.tar
+
+      - name: Upload Cache
         uses: actions/cache@v4
         with:
           key: ${{ github.run_id }}-${{ matrix.node_version }}-${{ matrix.target.os }}-${{ matrix.target.arch }}
           path: node-${{ matrix.node_version }}-${{ matrix.target.os }}-${{ matrix.target.arch }}.tar.br
 
-      - name: Release
-        uses: softprops/action-gh-release@v1
-        if: github.ref_name == 'master'
+  build-darwin:
+    strategy:
+      matrix:
+        node_version: ["24.16.0"]
+        target:
+          - { os: "darwin", arch: "x64", runner: "macos-15-intel" }
+          - { os: "darwin", arch: "arm64", runner: "macos-15" }
+
+    runs-on: ${{ matrix.target.runner }}
+
+    env:
+      CCACHE_BASEDIR: ${{ github.workspace }}
+      CCACHE_COMPILERCHECK: content
+      CCACHE_DIR: ${{ github.workspace }}/.ccache
+      CCACHE_MAXSIZE: 2G
+
+    steps:
+      - uses: maxim-lobanov/setup-xcode@v1
         with:
-          files: |
-            ./*.tar.br
-          token: ${{ secrets.GITHUB_TOKEN }}
-          tag_name: build-${{ github.run_id }}
-          name: Build ${{ github.run_id }}
+          xcode-version: latest
+
+      # add missing distutils package to python 3.12
+      - name: Install distutils
+        if: matrix.target.arch == 'x64'
+        run: |
+          pip install setuptools
+          brew install ccache make
+
+      # add missing distutils package to python 3.12, plus ccache and GNU make v4
+      # (GNU make v4 fixes `make -j N`: https://github.com/nodejs/node/issues/53176#issuecomment-2134740862)
+      - name: Install build tools
+        if: matrix.target.arch == 'arm64'
+        run: brew install python-setuptools ccache mak
+
+      - name: Put build tools first in PATH
+        run: |
+          echo "$(brew --prefix)/opt/make/libexec/gnubin" >> "$GITHUB_PATH"
+          echo "$(brew --prefix)/opt/ccache/libexec" >> "$GITHUB_PATH"
+
+      # Remove unneeded stuff to free up build space (from Node https://github.com/nodejs/build/issues/3878)
+      - name: Cleanup before build
+        run: |
+          sudo rm -rf /Users/runner/Library/Android/sdk
+          sudo rm -rf /Users/runner/Library/Developer/CoreSimulator/Caches
+          echo "::group::Free space after cleanup"
+          df -h
+          echo "::endgroup::"
+
+      - name: Configure
+        run: |
+          export CC=clang
+          export CXX=clang++
+          export CC_host=clang
+          export CXX_host=clang++
+          export AR=ar
+          export RANLIB=ranlib
+          ./configure --enable-lto --without-inspector --without-npm
+
+      - name: Show ccache stats
+        if: always()
+        run: ccache --show-stats || true
+
+      - name: Package build cache
+        shell: bash
+        run: |
+          mkdir artifact
+          cp -r node artifact/node
+          cp -r .ccache artifact/.ccache
+
+      - name: Create archive
+        run: |
+          tar -cf node-${{ matrix.node_version }}-${{ matrix.target.os }}-${{ matrix.target.arch }}.tar artifact
+          brotli node-${{ matrix.node_version }}-${{ matrix.target.os }}-${{ matrix.target.arch }}.tar
+
+      - name: Upload Cache
+        uses: actions/cache@v4
+        with:
+          key: ${{ github.run_id }}-${{ matrix.node_version }}-${{ matrix.target.os }}-${{ matrix.target.arch }}
+          path: node-${{ matrix.node_version }}-${{ matrix.target.os }}-${{ matrix.target.arch }}.tar.br
+
+  # aggregation-artifacts:
+  #   needs:
+  #     - build-linux
+  #     - build-windows
+  #     - build-darwin
+
+  #   strategy:
+  #     matrix:
+  #       node_version: ["24.16.0"]
+  #       target:
+  #         - { os: "linux", arch: "arm64", runner: "ubuntu-24.04-arm" }
+  #         - { os: "alpine", arch: "arm64", runner: "ubuntu-24.04-arm" }
+  #         - { os: "linuxstatic", arch: "arm64", runner: "ubuntu-24.04-arm" }
+
+  #   runs-on: ubuntu
+
+  #   steps:
+  #     - name: Restore Cache
+  #       uses: actions/cache@v4
+  #       with:
+  #         key: ${{ github.run_id }}-${{ matrix.node_version }}-${{ matrix.target.os }}-${{ matrix.target.arch }}
+  #         path: node-${{ matrix.node_version }}-${{ matrix.target.os }}-${{ matrix.target.arch }}.tar.br
+
+  #     - name: Release
+  #       uses: softprops/action-gh-release@v1
+  #       if: github.ref_name == 'master'
+  #       with:
+  #         files: |
+  #           ./*.tar.br
+  #         token: ${{ secrets.GITHUB_TOKEN }}
+  #         tag_name: build-${{ github.run_id }}
+  #         name: Build ${{ github.run_id }}
