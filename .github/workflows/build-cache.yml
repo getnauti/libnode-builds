@@ -165,13 +165,20 @@ jobs:
         run: |
           mkdir .\ccache-bin
 
-          Copy-Item `
-            "C:\ProgramData\chocolatey\bin\sccache.exe" `
-            ".\ccache-bin\clang-cl.exe"
+          # Use the actual sccache binary, not the chocolatey shim.
+          # The chocolatey shim in bin/ uses a relative path to find the real
+          # binary, so copying the shim to a different directory breaks it.
+          $sccacheBin = Get-ChildItem `
+            "C:\ProgramData\chocolatey\lib\sccache\tools\*\sccache.exe" |
+            Select-Object -First 1 -ExpandProperty FullName
 
-          Copy-Item `
-            "C:\ProgramData\chocolatey\bin\sccache.exe" `
-            ".\ccache-bin\cl.exe"
+          if (-not $sccacheBin) {
+            Write-Error "Could not find sccache binary in chocolatey lib directory"
+            exit 1
+          }
+
+          Copy-Item $sccacheBin ".\ccache-bin\clang-cl.exe"
+          Copy-Item $sccacheBin ".\ccache-bin\cl.exe"
 
       - name: Checkout Node.js Source Code
         shell: bash
