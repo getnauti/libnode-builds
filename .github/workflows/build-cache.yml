@@ -239,7 +239,7 @@ jobs:
         node_version: ["24.16.0"]
         target:
           - { os: "darwin", arch: "x64", runner: "macos-14-large" }
-          - { os: "darwin", arch: "arm64", runner: "macos-14-xlarge" }
+          - { os: "darwin", arch: "arm64", runner: "macos-14" }
 
     runs-on: ${{ matrix.target.runner }}
 
