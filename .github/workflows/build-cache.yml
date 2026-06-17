@@ -8,7 +8,7 @@ on:
       - '*/*'
 
 jobs:
-  build-linux-standard:
+  build-linux-standard-and-static-libc-arm64:
     strategy:
       matrix:
         node_version: ["24.16.0"]
@@ -32,7 +32,8 @@ jobs:
             curl \
             ccache \
             pkg-config \
-            brotli
+            brotli \
+            musl-tools
 
       - uses: ./.github/actions/build-node-cache
         with:
@@ -43,13 +44,13 @@ jobs:
           run_id: ${{ github.run_id }}
           ccache_dir: ${{ env.CCACHE_DIR }}
 
-  build-linux-static-libc:
+  build-linux-static-libc-x64:
     strategy:
       matrix:
         node_version: ["24.16.0"]
         target:
-          - { os: "alpine", arch: "arm64", runner: "ubuntu-24.04-arm" }
-          - { os: "linuxstatic", arch: "arm64", runner: "ubuntu-24.04-arm" }
+          - { os: "alpine", arch: "x64", runner: "ubuntu-24.04" }
+          - { os: "linuxstatic", arch: "x64", runner: "ubuntu-24.04" }
 
     runs-on: ${{ matrix.target.runner }}
 
@@ -86,8 +87,8 @@ jobs:
 
   release:
     needs:
-      - build-linux-standard
-      - build-linux-static-libc
+      - build-linux-standard-and-static-libc-arm64
+      - build-linux-static-libc-x64
 
     strategy:
       matrix:
