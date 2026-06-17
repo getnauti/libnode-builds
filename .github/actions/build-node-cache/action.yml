@@ -1,7 +1,7 @@
 name: Build Node Cache
 
 inputs:
-  node-version:
+  node_version:
     required: true
   os:
     required: true
@@ -22,9 +22,9 @@ runs:
       shell: bash
       run: |
         curl -L -o node.tar.gz \
-          https://github.com/nodejs/node/archive/refs/tags/v${{ inputs.node-version }}.tar.gz
+          https://github.com/nodejs/node/archive/refs/tags/v${{ inputs.node_version }}.tar.gz
         tar -zxf node.tar.gz
-        mv node-${{ inputs.node-version }} node
+        mv node-${{ inputs.node_version }} node
         rm node.tar.gz
 
     - name: Setup ccache
