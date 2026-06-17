@@ -123,6 +123,7 @@ jobs:
         run: |
           mkdir artifact
           cp -r node artifact/node
+          ls -al .ccache
           cp -r .ccache artifact/.ccache
 
       - name: Create archive
@@ -201,6 +202,7 @@ jobs:
         run: |
           mkdir artifact
           cp -r node artifact/node
+          ls -al .ccache
           cp -r .ccache artifact/.ccache
 
       - name: Create archive
@@ -294,6 +296,7 @@ jobs:
         run: |
           mkdir artifact
           cp -r node artifact/node
+          ls -al .ccache
           cp -r .ccache artifact/.ccache
 
       - name: Create archive
