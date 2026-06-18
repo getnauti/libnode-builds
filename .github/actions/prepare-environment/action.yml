@@ -7,10 +7,6 @@ inputs:
     required: true
   arch:
     required: true
-  token:
-    required: true
-  ccache_dir:
-    required: true
 
 runs:
   using: composite
@@ -48,7 +44,7 @@ runs:
     # add missing distutils package to python 3.12
     - name: Install build tools (Darwin x64)
       shell: bash
-      if: ${{ inputs.os == 'darwin' && matrix.target.arch == 'x64' }}
+      if: ${{ inputs.os == 'darwin' && inputs.arch == 'x64' }}
       run: |
         pip install setuptools
         brew install ccache make
@@ -57,7 +53,7 @@ runs:
     # (GNU make v4 fixes `make -j N`: https://github.com/nodejs/node/issues/53176#issuecomment-2134740862)
     - name: Install build tools (Darwin ARM64)
       shell: bash
-      if: ${{ inputs.os == 'darwin' && matrix.target.arch == 'arm64' }}
+      if: ${{ inputs.os == 'darwin' && inputs.arch == 'arm64' }}
       run: brew install python-setuptools ccache make
 
     # Remove unneeded stuff to free up build space (from Node https://github.com/nodejs/build/issues/3878)
