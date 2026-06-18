@@ -71,7 +71,7 @@ runs:
       working-directory: ${{ github.workspace }}
       if: ${{ (inputs.os == 'alpine' || inputs.os == 'linuxstatic') && inputs.arch == 'arm64' }}
       run: |
-        curl -LO https://github.com/troglobit/misc/releases/download/11-20211120/aarch64-linux-musl-cross.tgz
+        curl -LO https://musl.cc/aarch64-linux-musl-cross.tgz/aarch64-linux-musl-cross.tgz
         tar zxvf aarch64-linux-musl-cross.tgz
         rm -rf aarch64-linux-musl-cross.tgz
 
@@ -142,6 +142,7 @@ runs:
 
         if [[ ("$OS" == "alpine" || "$OS" == "linuxstatic")  && "$ARCH" == "arm64" ]]; then
           echo "${{ github.workspace }}/aarch64-linux-musl-cross/bin" >> $GITHUB_PATH
+          BUILD_ARGS="$BUILD_ARGS --dest-cpu=arm64 --dest-os=linux --cross-compiling"
           case "$OS" in
             linuxstatic)
               echo "CC=aarch64-linux-musl-gcc" >> $GITHUB_ENV
