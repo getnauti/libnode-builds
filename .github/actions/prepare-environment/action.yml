@@ -34,7 +34,7 @@ runs:
           pkg-config \
           musl-tools
 
-    - name: Install dependencies: Setup XCode (Darwin)
+    - name: Setup XCode (Darwin)
       shell: bash
       if: ${{ inputs.os == 'darwin' }}
       uses: maxim-lobanov/setup-xcode@v1
