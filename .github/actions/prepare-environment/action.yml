@@ -1,0 +1,199 @@
+name: Build Node Cache
+
+inputs:
+  node_version:
+    required: true
+  os:
+    required: true
+  arch:
+    required: true
+  token:
+    required: true
+  ccache_dir:
+    required: true
+
+runs:
+  using: composite
+
+  steps:
+    - name: Checkout Node.js Source Code
+      shell: bash
+      run: |
+        curl -L -o node.tar.gz \
+          https://github.com/nodejs/node/archive/refs/tags/v${{ inputs.node_version }}.tar.gz
+        tar -zxf node.tar.gz
+        mv node-${{ inputs.node_version }} node
+        rm node.tar.gz
+
+    - name: Install dependencies (Linux)
+      shell: bash
+      if: ${{ inputs.os != 'windows' && inputs.os != 'darwin' }}
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          build-essential \
+          python3 \
+          curl \
+          ccache \
+          pkg-config \
+          musl-tools
+
+    - name: Install dependencies: Setup XCode (Darwin)
+      shell: bash
+      if: ${{ inputs.os == 'darwin' }}
+      uses: maxim-lobanov/setup-xcode@v1
+      with:
+        xcode-version: latest
+
+    # add missing distutils package to python 3.12
+    - name: Install build tools (Darwin x64)
+      shell: bash
+      if: ${{ inputs.os == 'darwin' && matrix.target.arch == 'x64' }}
+      run: |
+        pip install setuptools
+        brew install ccache make
+
+    # add missing distutils package to python 3.12, plus ccache and GNU make v4
+    # (GNU make v4 fixes `make -j N`: https://github.com/nodejs/node/issues/53176#issuecomment-2134740862)
+    - name: Install build tools (Darwin ARM64)
+      shell: bash
+      if: ${{ inputs.os == 'darwin' && matrix.target.arch == 'arm64' }}
+      run: brew install python-setuptools ccache make
+
+    # Remove unneeded stuff to free up build space (from Node https://github.com/nodejs/build/issues/3878)
+    - name: Cleanup before build
+      shell: bash
+      if: ${{ inputs.os == 'darwin' }}
+      run: |
+        sudo rm -rf /Users/runner/Library/Android/sdk
+        sudo rm -rf /Users/runner/Library/Developer/CoreSimulator/Caches
+        echo "::group::Free space after cleanup"
+        df -h
+        echo "::endgroup::"
+
+    - name: Setup MUSL ARM64 (Linux ARM64 static libc)
+      shell: bash
+      if: ${{ (inputs.os == 'alpine' || inputs.os == 'linuxstatic') && inputs.arch == 'arm64' }}
+      run: |
+        curl -LO https://github.com/troglobit/misc/releases/download/11-20211120/aarch64-linux-musl-cross.tgz
+        tar zvf aarch64-linux-musl-cross.tgz
+        rm -rf aarch64-linux-musl-cross.tgz
+
+    - name: Setup MUSL x64 (Linux x64 static libc)
+      shell: bash
+      if: ${{ (inputs.os == 'alpine' || inputs.os == 'linuxstatic') && inputs.arch == 'x64' }}
+      run: |
+        curl -LO https://github.com/troglobit/misc/releases/download/11-20211120/x86_64-linux-musl-cross.tgz
+        tar zvf x86_64-linux-musl-cross.tgz
+        rm -rf x86_64-linux-musl-cross.tgz
+
+    - name: Set up Python (Windows)
+      shell: pwsh
+      if: ${{ inputs.os == 'windows' }}
+      uses: actions/setup-python@v6
+      with:
+        python-version: '3.12'
+        check-latest: true
+
+    - name: Install NASM (Windows)
+      shell: cmd
+      if: ${{ inputs.os == 'windows' }}
+      run: |
+        choco install nasm sccache llvm -y
+
+    - name: Setup ccache launcher (Windows)
+      shell: pwsh
+      if: ${{ inputs.os == 'windows' }}
+      run: |
+        mkdir .\ccache-bin
+
+        # Use the actual sccache binary, not the chocolatey shim.
+        # The chocolatey shim in bin/ uses a relative path to find the real
+        # binary, so copying the shim to a different directory breaks it.
+        $sccacheBin = Get-ChildItem `
+          "C:\ProgramData\chocolatey\lib\sccache\tools\*\sccache.exe" |
+          Select-Object -First 1 -ExpandProperty FullName
+
+        if (-not $sccacheBin) {
+          Write-Error "Could not find sccache binary in chocolatey lib directory"
+          exit 1
+        }
+
+        Copy-Item $sccacheBin ".\ccache-bin\clang-cl.exe"
+        Copy-Item $sccacheBin ".\ccache-bin\cl.exe"
+
+    - name: Prepare environment variables (Linux/Darwin)
+      shell: bash
+      if: ${{ inputs.os != 'windows' }}
+      run: |
+        BUILD_ARGS="--enable-lto --without-inspector --without-npm --with-intl=small-icu"
+
+        case "$OS" in
+          linuxstatic)
+            BUILD_ARGS="$BUILD_ARGS --fully-static"
+            ;;
+          alpine)
+            BUILD_ARGS="$BUILD_ARGS --partly-static"
+            ;;
+          darwin)
+            BUILD_ARGS="$BUILD_ARGS -dest-cpu ${{ inputs.arch }} --without-node-options --shared-zlib"
+            ;;
+        esac
+
+        echo "ARCH=${{ inputs.arch }}" >> $GITHUB_ENV
+        echo "BUILD_ARGS=$BUILD_ARGS" >> $GITHUB_ENV
+
+        if [[ ("$OS" == "alpine" || "$OS" == "linuxstatic")  && "$ARCH" == "arm64" ]]; then
+          echo "./aarch64-linux-musl-cross/bin" >> $GITHUB_PATH
+          case "$OS" in
+            linuxstatic)
+              echo "CC=\"aarch64-linux-musl-gcc -static\"" >> $GITHUB_ENV
+              echo "CXX=\"aarch64-linux-musl-g++ -static\"" >> $GITHUB_ENV
+              ;;
+            alpine)
+              echo "CC=aarch64-linux-musl-gcc" >> $GITHUB_ENV
+              echo "CXX=aarch64-linux-musl-g++" >> $GITHUB_ENV
+              ;;
+          esac
+          echo "AR=aarch64-linux-musl-ar" >> $GITHUB_ENV
+          echo "RANLIB=aarch64-linux-musl-ranlib" >> $GITHUB_ENV
+        fi
+
+        if [[ ("$OS" == "alpine" || "$OS" == "linuxstatic")  && "$ARCH" == "x64" ]]; then
+          echo "./x86_64-linux-musl-cross/bin" >> $GITHUB_PATH
+          case "$OS" in
+            linuxstatic)
+              echo "CC=\"x86_64-linux-musl-gcc -static\"" >> $GITHUB_ENV
+              echo "CXX=\"x86_64-linux-musl-g++ -static\"" >> $GITHUB_ENV
+              ;;
+            alpine)
+              echo "CC=x86_64-linux-musl-gcc" >> $GITHUB_ENV
+              echo "CXX=x86_64-linux-musl-g++" >> $GITHUB_ENV
+              ;;
+          esac
+          echo "AR=x86_64-linux-musl-ar" >> $GITHUB_ENV
+          echo "RANLIB=x86_64-linux-musl-ranlib" >> $GITHUB_ENV
+        fi
+
+        if [[ "$OS" == "darwin" ]]; then
+          echo "CC=clang" >> $GITHUB_ENV
+          echo "CXX=clang++" >> $GITHUB_ENV
+          echo "CC_host=clang" >> $GITHUB_ENV
+          echo "CXX_host=clang++" >> $GITHUB_ENV
+          echo "AR=ar" >> $GITHUB_ENV
+          echo "RANLIB=ranlib" >> $GITHUB_ENV
+          echo "$(brew --prefix)/opt/make/libexec/gnubin" >> "$GITHUB_PATH"
+          echo "$(brew --prefix)/opt/ccache/libexec" >> "$GITHUB_PATH"
+        fi
+
+        echo "CCACHE_BASEDIR=${{ github.workspace }}" >> $GITHUB_ENV
+        echo "CCACHE_COMPILERCHECK=content" >> $GITHUB_ENV
+        echo "CCACHE_DIR=${{ github.workspace }}/.ccache" >> $GITHUB_ENV
+        echo "CCACHE_MAXSIZE=2G" >> $GITHUB_ENV
+
+    - name: Prepare environment variables (Windows)
+      shell: pwsh
+      if: ${{ inputs.os == 'windows' }}
+      run: |
+        Add-Content -Path $env:GITHUB_ENV -Value "config_flags=""--without-inspector --without-npm --use-ccache-win --with-ltcg"""
+        Add-Content -Path $env:GITHUB_ENV -Value "SCCACHE_DIR=${{ github.workspace }}/.ccache"
