@@ -158,13 +158,8 @@ runs:
 
         if [[ "$OS" == "alpine" || "$OS" == "linuxstatic" ]]; then
           BUILD_ARGS="$BUILD_ARGS --dest-cpu=$ARCH --dest-os=linux --cross-compiling"
-          CFLAGS="-mno-avx512f -mno-avx512bw -mno-avx512vl -mno-avx512dq"
-          CXXFLAGS="$CFLAGS"
-
-          if [[ "$OS" == "linuxstatic" ]]; then
-            CFLAGS="$CFLAGS -static"
-            CXXFLAGS="$CXXFLAGS -static"
-          fi
+          CFLAGS=""
+          CXXFLAGS=""
 
           case "$ARCH" in
             arm64)
@@ -174,8 +169,15 @@ runs:
             x64)
               echo "CC=x86_64-linux-musl-gcc" >> $GITHUB_ENV
               echo "CXX=x86_64-linux-musl-g++" >> $GITHUB_ENV
+              CFLAGS="$CFLAGS -mno-avx512f -mno-avx512bw -mno-avx512vl -mno-avx512dq"
+              CXXFLAGS="$CXXFLAGS -mno-avx512f -mno-avx512bw -mno-avx512vl -mno-avx512dq"
               ;;
           esac
+
+          if [[ "$OS" == "linuxstatic" ]]; then
+            CFLAGS="$CFLAGS -static"
+            CXXFLAGS="$CXXFLAGS -static"
+          fi
         fi
 
         if [[ "$OS" == "darwin" ]]; then
