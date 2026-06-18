@@ -77,26 +77,27 @@ runs:
       shell: bash
       if: ${{ inputs.os == 'alpine' || inputs.os == 'linuxstatic' }}
       run: |
-        sudo cat > /usr/local/sbin/x86_64-linux-musl-gcc <<'EOF'
+        cat > ${{ github.workspace }}/.bin/x86_64-linux-musl-gcc <<'EOF'
         #!/bin/bash
         exec zig cc -target x86_64-linux-musl "$@"
         EOF
-        sudo cat > /usr/local/sbin/x86_64-linux-musl-g++ <<'EOF'
+        cat > ${{ github.workspace }}/.bin/x86_64-linux-musl-g++ <<'EOF'
         #!/bin/bash
         exec zig c++ -target x86_64-linux-musl "$@"
         EOF
-        sudo cat > /usr/local/sbin/aarch64-linux-musl-gcc <<'EOF'
+        cat > ${{ github.workspace }}/.bin/aarch64-linux-musl-gcc <<'EOF'
         #!/bin/bash
         exec zig cc -target aarch64-linux-musl "$@"
         EOF
-        sudo cat > /usr/local/sbin/aarch64-linux-musl-g++ <<'EOF'
+        cat > ${{ github.workspace }}/.bin/aarch64-linux-musl-g++ <<'EOF'
         #!/bin/bash
         exec zig c++ -target aarch64-linux-musl "$@"
         EOF
-        sudo chmod +x /usr/local/sbin/x86_64-linux-musl-gcc
-        sudo chmod +x /usr/local/sbin/x86_64-linux-musl-g++
-        sudo chmod +x /usr/local/sbin/aarch64-linux-musl-gcc
-        sudo chmod +x /usr/local/sbin/aarch64-linux-musl-g++
+        chmod +x ${{ github.workspace }}/.bin/x86_64-linux-musl-gcc
+        chmod +x ${{ github.workspace }}/.bin/x86_64-linux-musl-g++
+        chmod +x ${{ github.workspace }}/.bin/aarch64-linux-musl-gcc
+        chmod +x ${{ github.workspace }}/.bin/aarch64-linux-musl-g++
+        echo "${{ github.workspace }}/.bin" >> "$GITHUB_PATH"
 
     - name: Set up Python (Windows)
       if: ${{ inputs.os == 'windows' }}
