@@ -140,7 +140,7 @@ runs:
         echo "BUILD_ARGS=$BUILD_ARGS" >> $GITHUB_ENV
 
         if [[ ("$OS" == "alpine" || "$OS" == "linuxstatic")  && "$ARCH" == "arm64" ]]; then
-          echo "./aarch64-linux-musl-cross/bin" >> $GITHUB_PATH
+          echo "${{ github.workspace }}/aarch64-linux-musl-cross/bin" >> $GITHUB_PATH
           case "$OS" in
             linuxstatic)
               echo "CC=aarch64-linux-musl-gcc -static" >> $GITHUB_ENV
@@ -156,7 +156,7 @@ runs:
         fi
 
         if [[ ("$OS" == "alpine" || "$OS" == "linuxstatic")  && "$ARCH" == "x64" ]]; then
-          echo "./x86_64-linux-musl-cross/bin" >> $GITHUB_PATH
+          echo "${{ github.workspace }}/x86_64-linux-musl-cross/bin" >> $GITHUB_PATH
           case "$OS" in
             linuxstatic)
               echo "CC=x86_64-linux-musl-gcc -static" >> $GITHUB_ENV
