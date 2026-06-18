@@ -73,12 +73,12 @@ runs:
 
     - name: Setup Zig (Linux static libs for x64)
       uses: goto-bus-stop/setup-zig@v2
-      if: ${{ (input.os == 'alpine' || input.os == 'linuxstatic') && input.arch == 'x64' }}
+      if: ${{ (inputs.os == 'alpine' || inputs.os == 'linuxstatic') && inputs.arch == 'x64' }}
       with:
         version: 0.12.0
 
     - name: Setup Zig (Linux static libs for arm64)
-      if: ${{ (input.os == 'alpine' || input.os == 'linuxstatic') && input.arch == 'arm64' }}
+      if: ${{ (inputs.os == 'alpine' || inputs.os == 'linuxstatic') && inputs.arch == 'arm64' }}
       uses: mlugg/setup-zig@v2
 
     - name: Setup Zig C compiler shell scripts (Linux static libc)

@@ -39,6 +39,7 @@ jobs:
           node_version: ${{ matrix.node_version }}
           os: ${{ matrix.target.os }}
           arch: ${{ matrix.target.arch }}
+          runner: ${{ matrix.target.runner }}
 
       - name: Configure (Linux/Darwin)
         working-directory: node
