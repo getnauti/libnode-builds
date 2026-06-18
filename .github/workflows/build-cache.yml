@@ -54,11 +54,12 @@ jobs:
 
       - name: Build (Darwin)
         working-directory: node
-        if: ${{ matrix.target.os != 'windows' && matrix.target.os != 'darwin' }}
+        if: ${{ matrix.target.os == 'darwin' }}
         run: |
           make -j$(sysctl -n hw.ncpu)
 
       - name: Build (Windows)
+        if: ${{ matrix.target.os == 'windows' }}
         working-directory: node
         run: |
           cmd /c "vcbuild.bat ${{ matrix.target.arch }} full-icu ccache %GITHUB_WORKSPACE%\ccache-bin"
