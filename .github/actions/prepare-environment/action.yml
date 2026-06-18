@@ -118,6 +118,9 @@ runs:
 
     - name: Prepare environment variables (Linux/Darwin)
       shell: bash
+      env:
+        OS: ${{ inputs.os }}
+        ARCH: ${{ inputs.arch }}
       if: ${{ inputs.os != 'windows' }}
       run: |
         BUILD_ARGS="--enable-lto --without-inspector --without-npm --with-intl=small-icu"
@@ -134,7 +137,6 @@ runs:
             ;;
         esac
 
-        echo "ARCH=${{ inputs.arch }}" >> $GITHUB_ENV
         echo "BUILD_ARGS=$BUILD_ARGS" >> $GITHUB_ENV
 
         if [[ ("$OS" == "alpine" || "$OS" == "linuxstatic")  && "$ARCH" == "arm64" ]]; then
