@@ -177,7 +177,7 @@ runs:
         esac
 
         if [[ "$OS" == "alpine" || "$OS" == "linuxstatic" ]]; then
-          BUILD_ARGS="$BUILD_ARGS --dest-cpu=$ARCH --dest-os=linux --cross-compiling"
+          BUILD_ARGS="$BUILD_ARGS --dest-cpu=$ARCH --dest-os=linux"
           CFLAGS=""
           CXXFLAGS=""
 
