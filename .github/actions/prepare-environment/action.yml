@@ -163,6 +163,7 @@ runs:
       if: ${{ inputs.os != 'windows' }}
       run: |
         BUILD_ARGS="--without-inspector --without-npm"
+        JOBS=""
 
         case "$OS" in
           linuxstatic)
@@ -229,9 +230,11 @@ runs:
           echo "RANLIB=ranlib" >> $GITHUB_ENV
           echo "$(brew --prefix)/opt/make/libexec/gnubin" >> "$GITHUB_PATH"
           echo "$(brew --prefix)/opt/ccache/libexec" >> "$GITHUB_PATH"
+          JOBS=$(sysctl -n hw.ncpu)
           BUILD_ARGS="$BUILD_ARGS --with-intl=small-icu"
         else
           BUILD_ARGS="$BUILD_ARGS --without-intl --enable-lto"
+          JOBS=$(nproc)
         fi
 
         echo "CCACHE_BASEDIR=${{ github.workspace }}" >> $GITHUB_ENV
@@ -241,6 +244,7 @@ runs:
         echo "BUILD_ARGS=$BUILD_ARGS" >> $GITHUB_ENV
         echo "CFLAGS=$CFLAGS" >> $GITHUB_ENV
         echo "CXXFLAGS=$CXXFLAGS" >> $GITHUB_ENV
+        echo "JOBS=$JOBS" >> $GITHUB_ENV
 
     - name: Prepare environment variables (Windows)
       shell: pwsh

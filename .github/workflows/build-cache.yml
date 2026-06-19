@@ -11,21 +11,25 @@ permissions:
   contents: write
 
 jobs:
-  build-universal:
+  load-matrix:
+    runs-on: ubuntu-latest
+
+    outputs:
+      matrix: ${{ steps.load.outputs.matrix }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: load
+        shell: bash
+        run: |
+          echo "matrix=$(jq -c . matrix.json)" >> "$GITHUB_OUTPUT"
+
+  build:
+    needs: load-matrix
+
     strategy:
-      matrix:
-        node_version: ["24.16.0"]
-        target:
-          - { os: "linux", arch: "x64", runner: "ubuntu-24.04" }
-          - { os: "linux", arch: "arm64", runner: "ubuntu-24.04-arm" }
-          - { os: "alpine", arch: "x64", runner: "ubuntu-24.04" }
-          - { os: "alpine", arch: "arm64", runner: "ubuntu-24.04-arm" }
-          - { os: "linuxstatic", arch: "x64", runner: "ubuntu-24.04" }
-          - { os: "linuxstatic", arch: "arm64", runner: "ubuntu-24.04-arm" }
-          - { os: "windows", arch: "x64", runner: "windows-2022" }
-          - { os: "windows", arch: "arm64", runner: "windows-11-arm" }
-          - { os: "darwin", arch: "x64", runner: "macos-15-intel" }
-          - { os: "darwin", arch: "arm64", runner: "macos-15" }
+      matrix: ${{ fromJson(needs.load-matrix.outputs.matrix) }}
 
     runs-on: ${{ matrix.target.runner }}
 
@@ -47,17 +51,11 @@ jobs:
         run: |
           ./configure $BUILD_ARGS
 
-      - name: Build (Linux)
+      - name: Make (Linux/Darwin)
         working-directory: node
-        if: ${{ matrix.target.os != 'windows' && matrix.target.os != 'darwin' }}
+        if: ${{ matrix.target.os != 'windows' }}
         run: |
-          make -j$(nproc)
-
-      - name: Build (Darwin)
-        working-directory: node
-        if: ${{ matrix.target.os == 'darwin' }}
-        run: |
-          make -j$(sysctl -n hw.ncpu)
+          make -j$JOBS
 
       - name: Build (Windows)
         if: ${{ matrix.target.os == 'windows' }}
@@ -78,230 +76,42 @@ jobs:
         shell: bash
         run: |
           tar -czf node-${{ matrix.node_version }}-${{ matrix.target.os }}-${{ matrix.target.arch }}.tar.gz artifact
-          split -b 1024M node-${{ matrix.node_version }}-${{ matrix.target.os }}-${{ matrix.target.arch }}.tar.gz node-${{ matrix.node_version }}-${{ matrix.target.os }}-${{ matrix.target.arch }}.tar.gz.part.
+
+      - name: Upload Cache
+        uses: actions/cache@v4
+        with:
+          key: ${{ github.run_id }}-${{ matrix.node_version }}-${{ matrix.target.os }}-${{ matrix.target.arch }}
+          path: node-${{ matrix.node_version }}-${{ matrix.target.os }}-${{ matrix.target.arch }}.tar.gz
+
+  release:
+    needs:
+      - load-matrix
+      - build
+
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix: ${{ fromJson(needs.load-matrix.outputs.matrix) }}
+
+    steps:
+      - name: Download Cache
+        uses: actions/cache@v4
+        id: cache
+        with:
+          key: ${{ github.run_id }}-${{ matrix.node_version }}-${{ matrix.target.os }}-${{ matrix.target.arch }}
+          path: node-${{ matrix.node_version }}-${{ matrix.target.os }}-${{ matrix.target.arch }}.tar.gz
+
+      - name: Split package
+        shell: bash
+        run: |
+          split -b 1900M node-${{ matrix.node_version }}-${{ matrix.target.os }}-${{ matrix.target.arch }}.tar.gz node-${{ matrix.node_version }}-${{ matrix.target.os }}-${{ matrix.target.arch }}.tar.gz.part.
+          ls -lh *.part.*
 
       - name: Release
-        uses: softprops/action-gh-release@v1
-        if: github.ref_name == 'master'
+        uses: softprops/action-gh-release@v2
         with:
+          name: Build ${{ github.run_id }}
+          token: ${{ secrets.NORANTEC_PKG_TOKEN }}
+          tag_name: build-${{ github.run_id }}
           files: |
             node-${{ matrix.node_version }}-${{ matrix.target.os }}-${{ matrix.target.arch }}.tar.gz.part.*
-          token: ${{ secrets.GITHUB_TOKEN }}
-          tag_name: build-${{ github.run_id }}
-          name: Build ${{ github.run_id }}
-
-  # build-windows:
-  #   strategy:
-  #     matrix:
-  #       node_version: ["24.16.0"]
-  #       target:
-  #         - { os: "windows", arch: "x64", runner: "windows-2022" }
-  #         - { os: "windows", arch: "arm64", runner: "windows-11-arm" }
-
-  #   runs-on: ${{ matrix.target.runner }}
-
-  #   env:
-  #     SCCACHE_DIR: ${{ github.workspace }}/.ccache
-
-  #   steps:
-  #     - name: Set up Python
-  #       uses: actions/setup-python@v6
-  #       with:
-  #         python-version: '3.12'
-  #         check-latest: true
-
-  #     - name: Install NASM
-  #       shell: cmd
-  #       run: |
-  #         choco install nasm sccache llvm -y
-
-  #     - name: Setup ccache launcher
-  #       shell: pwsh
-  #       run: |
-  #         mkdir .\ccache-bin
-
-  #         # Use the actual sccache binary, not the chocolatey shim.
-  #         # The chocolatey shim in bin/ uses a relative path to find the real
-  #         # binary, so copying the shim to a different directory breaks it.
-  #         $sccacheBin = Get-ChildItem `
-  #           "C:\ProgramData\chocolatey\lib\sccache\tools\*\sccache.exe" |
-  #           Select-Object -First 1 -ExpandProperty FullName
-
-  #         if (-not $sccacheBin) {
-  #           Write-Error "Could not find sccache binary in chocolatey lib directory"
-  #           exit 1
-  #         }
-
-  #         Copy-Item $sccacheBin ".\ccache-bin\clang-cl.exe"
-  #         Copy-Item $sccacheBin ".\ccache-bin\cl.exe"
-
-  #     - name: Checkout Node.js Source Code
-  #       shell: bash
-  #       run: |
-  #         curl -L -o node.tar.gz \
-  #           https://github.com/nodejs/node/archive/refs/tags/v${{ matrix.node_version }}.tar.gz
-  #         tar -zxf node.tar.gz
-  #         mv node-${{ matrix.node_version }} node
-  #         rm node.tar.gz
-
-  #     - name: Build
-  #       working-directory: node
-  #       env:
-  #         "config_flags": "--without-inspector --without-npm --use-ccache-win --with-ltcg"
-  #       run: |
-  #         cmd /c "vcbuild.bat ${{ matrix.target.arch }} full-icu ccache %GITHUB_WORKSPACE%\ccache-bin"
-
-  #     - name: Package build cache
-  #       shell: bash
-  #       run: |
-  #         mkdir artifact
-  #         cp -r node artifact/node
-  #         ls -al .ccache
-  #         cp -r .ccache artifact/.ccache
-
-  #     - name: Create archive
-  #       run: |
-  #         tar -czf node-${{ matrix.node_version }}-${{ matrix.target.os }}-${{ matrix.target.arch }}.tar.gz artifact
-
-  #     - name: Upload Cache
-  #       uses: actions/cache@v4
-  #       with:
-  #         key: ${{ github.run_id }}-${{ matrix.node_version }}-${{ matrix.target.os }}-${{ matrix.target.arch }}
-  #         path: node-${{ matrix.node_version }}-${{ matrix.target.os }}-${{ matrix.target.arch }}.tar.gz
-
-  # build-darwin:
-  #   strategy:
-  #     matrix:
-  #       node_version: ["24.16.0"]
-  #       target:
-  #         - { os: "darwin", arch: "x64", runner: "macos-14-intel" }
-  #         - { os: "darwin", arch: "arm64", runner: "macos-14" }
-
-  #   runs-on: ${{ matrix.target.runner }}
-
-  #   env:
-  #     CCACHE_BASEDIR: ${{ github.workspace }}
-  #     CCACHE_COMPILERCHECK: content
-  #     CCACHE_DIR: ${{ github.workspace }}/.ccache
-  #     CCACHE_MAXSIZE: 2G
-
-  #   steps:
-  #     - uses: maxim-lobanov/setup-xcode@v1
-  #       with:
-  #         xcode-version: latest
-
-  #     # add missing distutils package to python 3.12
-  #     - name: Install distutils
-  #       if: matrix.target.arch == 'x64'
-  #       run: |
-  #         pip install setuptools
-  #         brew install ccache make
-
-  #     - name: Checkout Node.js Source Code
-  #       run: |
-  #         curl -L -o node.tar.gz \
-  #           https://github.com/nodejs/node/archive/refs/tags/v${{ matrix.node_version }}.tar.gz
-  #         tar -zxf node.tar.gz
-  #         mv node-${{ matrix.node_version }} node
-  #         rm node.tar.gz
-
-  #     # add missing distutils package to python 3.12, plus ccache and GNU make v4
-  #     # (GNU make v4 fixes `make -j N`: https://github.com/nodejs/node/issues/53176#issuecomment-2134740862)
-  #     - name: Install build tools
-  #       if: matrix.target.arch == 'arm64'
-  #       run: brew install python-setuptools ccache make
-
-  #     - name: Put build tools first in PATH
-  #       run: |
-  #         echo "$(brew --prefix)/opt/make/libexec/gnubin" >> "$GITHUB_PATH"
-  #         echo "$(brew --prefix)/opt/ccache/libexec" >> "$GITHUB_PATH"
-
-  #     # Remove unneeded stuff to free up build space (from Node https://github.com/nodejs/build/issues/3878)
-  #     - name: Cleanup before build
-  #       run: |
-  #         sudo rm -rf /Users/runner/Library/Android/sdk
-  #         sudo rm -rf /Users/runner/Library/Developer/CoreSimulator/Caches
-  #         echo "::group::Free space after cleanup"
-  #         df -h
-  #         echo "::endgroup::"
-
-  #     - name: Configure
-  #       working-directory: node
-  #       run: |
-  #         export CC=clang
-  #         export CXX=clang++
-  #         export CC_host=clang
-  #         export CXX_host=clang++
-  #         export AR=ar
-  #         export RANLIB=ranlib
-  #         ./configure --dest-cpu ${{ matrix.target.arch }} --without-inspector --without-node-options --without-npm --with-intl=small-icu --shared-zlib
-
-  #     - name: Build
-  #       working-directory: node
-  #       run: |
-  #         make -j$(sysctl -n hw.ncpu)
-
-  #     - name: Show ccache stats
-  #       if: always()
-  #       run: ccache --show-stats || true
-
-  #     - name: Package build cache
-  #       shell: bash
-  #       run: |
-  #         mkdir artifact
-  #         cp -r node artifact/node
-  #         ls -al .ccache
-  #         cp -r .ccache artifact/.ccache
-
-  #     - name: Create archive
-  #       run: |
-  #         tar -czf node-${{ matrix.node_version }}-${{ matrix.target.os }}-${{ matrix.target.arch }}.tar.gz artifact
-
-  #     # - name: Upload Cache
-  #     #   uses: actions/cache@v4
-  #     #   with:
-  #     #     key: ${{ github.run_id }}-${{ matrix.node_version }}-${{ matrix.target.os }}-${{ matrix.target.arch }}
-  #     #     path: node-${{ matrix.node_version }}-${{ matrix.target.os }}-${{ matrix.target.arch }}.tar.gz
-
-  #     - name: Release
-  #       uses: softprops/action-gh-release@v1
-  #       if: github.ref_name == 'master'
-  #       with:
-  #         files: |
-  #           node-${{ matrix.node_version }}-${{ matrix.target.os }}-${{ matrix.target.arch }}.tar.gz
-  #         token: ${{ secrets.GITHUB_TOKEN }}
-  #         tag_name: build-${{ github.run_id }}
-  #         name: Build ${{ github.run_id }}
-
-  # aggregation-artifacts:
-  #   needs:
-  #     - build-linux
-  #     - build-windows
-  #     - build-darwin
-
-  #   strategy:
-  #     matrix:
-  #       node_version: ["24.16.0"]
-  #       target:
-  #         - { os: "linux", arch: "arm64", runner: "ubuntu-24.04-arm" }
-  #         - { os: "alpine", arch: "arm64", runner: "ubuntu-24.04-arm" }
-  #         - { os: "linuxstatic", arch: "arm64", runner: "ubuntu-24.04-arm" }
-
-  #   runs-on: ubuntu
-
-  #   steps:
-  #     - name: Restore Cache
-  #       uses: actions/cache@v4
-  #       with:
-  #         key: ${{ github.run_id }}-${{ matrix.node_version }}-${{ matrix.target.os }}-${{ matrix.target.arch }}
-  #         path: node-${{ matrix.node_version }}-${{ matrix.target.os }}-${{ matrix.target.arch }}.tar.gz
-
-  #     - name: Release
-  #       uses: softprops/action-gh-release@v1
-  #       if: github.ref_name == 'master'
-  #       with:
-  #         files: |
-  #           ./*.tar.gz
-  #         token: ${{ secrets.GITHUB_TOKEN }}
-  #         tag_name: build-${{ github.run_id }}
-  #         name: Build ${{ github.run_id }}
