@@ -82,25 +82,19 @@ jobs:
         working-directory: node/out/Release
         run: |
           ls -alh
-          mv libnode.a ../../../libnode-${{ matrix.node_version }}-${{ matrix.target.os }}-${{ matrix.target.arch }}.a
+          tar czvf ../../../libnode-${{ matrix.node_version }}-${{ matrix.target.os }}-${{ matrix.target.arch }}.tar.gz $(find out -type f -name '*.a')
 
-      - name: List archive
+      - name: Cleanup source code and list archive
         shell: bash
         run: |
+          rm -rf node || true
           ls -alh
 
-      # - name: Create archive
-      #   shell: bash
-      #   run: |
-      #     tar -czf node-${{ matrix.node_version }}-${{ matrix.target.os }}-${{ matrix.target.arch }}.tar.gz artifact
-      #     ls -lh *.tar.gz
-      #     sudo rm -rf artifact || true
-
-      # - name: Split package
-      #   shell: bash
-      #   run: |
-      #     split -b 1900M node-${{ matrix.node_version }}-${{ matrix.target.os }}-${{ matrix.target.arch }}.tar.gz node-${{ matrix.node_version }}-${{ matrix.target.os }}-${{ matrix.target.arch }}.tar.gz.part.
-      #     ls -lh *.part.*
+      - name: Split package
+        shell: bash
+        run: |
+          split -b 1900M libnode-${{ matrix.node_version }}-${{ matrix.target.os }}-${{ matrix.target.arch }}.tar.gz libnode-${{ matrix.node_version }}-${{ matrix.target.os }}-${{ matrix.target.arch }}.tar.gz.part.
+          ls -lh *.part.*
 
       - name: Release
         uses: softprops/action-gh-release@v3
@@ -110,4 +104,4 @@ jobs:
           tag_name: build-${{ github.run_id }}
           make_latest: true
           files: |
-            libnode-${{ matrix.node_version }}-${{ matrix.target.os }}-${{ matrix.target.arch }}.a
+            libnode-${{ matrix.node_version }}-${{ matrix.target.os }}-${{ matrix.target.arch }}.tar.gz.part.*
