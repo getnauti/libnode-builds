@@ -84,7 +84,12 @@ jobs:
           ls -al
           ln libnode.*.dylib libnode.dylib || true
           ln libnode.so.* libnode.so || true
-          tar -czvf libnode-${{ matrix.node_version }}-${{ matrix.target.os }}-${{ matrix.target.arch }}.tar.gz node libnode.* || true
+          tar -czvf ../../../libnode-${{ matrix.node_version }}-${{ matrix.target.os }}-${{ matrix.target.arch }}.tar.gz node libnode.* || true
+
+      - name: List archive
+        shell: bash
+        run: |
+          ls -lh
 
       # - name: Create archive
       #   shell: bash
@@ -101,11 +106,10 @@ jobs:
 
       - name: Release
         uses: softprops/action-gh-release@v3
-        working-directory: node/out/Release
         with:
           name: Build ${{ github.run_id }}
           token: ${{ secrets.GITHUB_TOKEN }}
           tag_name: build-${{ github.run_id }}
           make_latest: true
           files: |
-            node-${{ matrix.node_version }}-${{ matrix.target.os }}-${{ matrix.target.arch }}.tar.gz
+            libnode-${{ matrix.node_version }}-${{ matrix.target.os }}-${{ matrix.target.arch }}.tar.gz
