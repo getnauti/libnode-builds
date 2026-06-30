@@ -181,9 +181,6 @@ runs:
           linuxstatic)
             BUILD_ARGS="$BUILD_ARGS --fully-static"
             ;;
-          alpine)
-            BUILD_ARGS="$BUILD_ARGS --partly-static"
-            ;;
           darwin)
             BUILD_ARGS="$BUILD_ARGS --dest-cpu=$ARCH --without-node-options"
             ;;
