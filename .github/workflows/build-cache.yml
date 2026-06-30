@@ -58,7 +58,7 @@ jobs:
 
       - name: Configure (Linux MUSL)
         working-directory: node
-        if: ${{ matrix.target.os == 'linuxstatic' || matrix.target.os == 'alpine' }}
+        if: ${{ matrix.target.os == 'linuxstatic' || matrix.target.os == 'alpine' || matrix.target.os == 'linux' }}
         run: |
           sed -i 's/crsT/crs/g' out/Makefile
 
