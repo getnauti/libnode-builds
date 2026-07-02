@@ -3,9 +3,7 @@ name: Build Node.js Cache
 on:
   push:
     branches:
-      - '*'
-      - '**'
-      - '*/*'
+      - master
 
 permissions:
   contents: write
@@ -50,23 +48,28 @@ jobs:
           arch: ${{ matrix.target.arch }}
           runner: ${{ matrix.target.runner }}
 
-      - name: Configure (Linux/Darwin)
+      - name: Configure (Linux MUSL/Darwin)
         working-directory: node
-        if: ${{ matrix.target.os != 'windows' }}
+        if: ${{ matrix.target.os == 'linuxstatic' || matrix.target.os == 'alpine' || matrix.target.os == 'darwin' }}
         run: |
           ./configure $BUILD_ARGS
 
       - name: Configure (Linux MUSL)
         working-directory: node
-        if: ${{ matrix.target.os == 'linuxstatic' || matrix.target.os == 'alpine' || matrix.target.os == 'linux' }}
+        if: ${{ matrix.target.os == 'linuxstatic' || matrix.target.os == 'alpine' }}
         run: |
           sed -i 's/crsT/crs/g' out/Makefile
 
-      - name: Make (Linux/Darwin)
+      - name: Make (Linux MUSL/Darwin)
         working-directory: node
-        if: ${{ matrix.target.os != 'windows' }}
+        if: ${{ matrix.target.os == 'linuxstatic' || matrix.target.os == 'alpine' || matrix.target.os == 'linux' }}
         run: |
           make -j$JOBS
+
+      - name: Build (Linux)
+        if: ${{ matrix.target.os == 'linux' }}
+        run: |
+          docker buildx build --no-cache --env-file $GITHUB_ENV -f ./Dockerfile.linux --output type=local,dest=node/out .
 
       - name: Cleanup (Darwin)
         working-directory: node
